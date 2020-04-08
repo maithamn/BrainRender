@@ -133,7 +133,7 @@ class BasicVideoMaker:
                     print("Exiting...")
                     return
 
-        if 'mp4' not in self.video_format: raise ValueError("Currently only .mp4 video format is supported")
+        if 'mp4' not in self.video_format and "avi" not in self.video_format: raise ValueError("Currently only .mp4 video format is supported")
 
         if self.duration is not None and self.fps is not None:
             print("An argument was passed for both duration and fps, but can't specify both at the same time"+
