@@ -1,7 +1,14 @@
 from vtkplotter import Video
 import datetime
+from tqdm import tqdm
 import os
+import numpy as np
+from tempfile import TemporaryDirectory
+from termcolor import cprint
 
+from vtkplotter import screenshot
+
+from brainrender.animation.video_utils import save_videocap_to_video, get_cap_from_images_folder
 
 class BasicVideoMaker:
     """
@@ -45,9 +52,60 @@ class BasicVideoMaker:
         self.save_fld = kwargs.pop('save_fld', self.save_fld)
         self.save_name = kwargs.pop('save_name', self.save_name)
         self.video_format = kwargs.pop('video_format', self.video_format)
+        self.video_format.replace(".", "")
         self.duration = kwargs.pop('duration', None)
-        self.niters = kwargs.pop('niters', self.niters)
-        self.fps = kwargs.pop("fps", self.fps)
+        self.niters = int(kwargs.pop('niters', self.niters))
+        self.fps = int(kwargs.pop("fps", self.fps))
+
+        self.complete_save_path = os.path.join(self.save_fld, self.save_name+"."+self.video_format)
+
+
+    def initialize_video_creation(self):
+        self.tmp_dir = TemporaryDirectory()
+        self.frames = []
+
+    def add_frame(self):
+        frame_path = os.path.join(self.tmp_dir.name, str(len(self.frames))+".png")
+        screenshot(filename=frame_path)
+        self.frames.append(frame_path)
+
+    def make_frames(self, azimuth=0, elevation=0, roll=0):
+        """
+        Creates the frames of a video, called from make_video. 
+        To make a custom video with more complex animation, subclass BasicVideoMaker and specify a new make_frames method
+
+        :param azimuth: integer, specify the rotation in degrees per frame on the relative axis. (Default value = 0)
+        :param elevation: integer, specify the rotation in degrees per frame on the relative axis. (Default value = 0)
+        :param roll: integer, specify the rotation in degrees per frame on the relative axis. (Default value = 0)
+        """
+        cprint("Creating frames", 'green', attrs=['bold'])
+        for i in tqdm(range(self.niters)):
+            # render the scene first
+            self.scene.render(interactive=False, video=True)  
+
+            # Move the camera
+            self.scene.plotter.camera.Elevation(elevation)
+            self.scene.plotter.camera.Azimuth(azimuth)
+            self.scene.plotter.camera.Roll(roll) 
+
+            # Add frame
+            self.add_frame()
+
+    def close(self):
+        # Check final duration and fps
+        if self.duration is not None:
+            self.fps = np.floor(len(self.frames) / float(self.duration))
+            print("Recalculated video FPS to", self.fps)
+        else:
+            self.fps = int(self.fps)
+
+        # Make video
+        cprint("Saving video to file", 'green', attrs=['bold'])
+        cap = get_cap_from_images_folder(self.tmp_dir.name)
+        save_videocap_to_video(cap, self.complete_save_path, self.video_format, fps=self.fps)
+
+        cprint(f"\nVideo creation completed, file saved at {self.complete_save_path}", 'green', attrs=['bold'])
+
 
     def make_video(self, azimuth=0, elevation=0, roll=0, **kwargs):
         """
@@ -59,69 +117,34 @@ class BasicVideoMaker:
         :param kwargs: use to change destination folder, video name, fps, duration ... check 'self.parse_kwargs' for details. 
         """
         self.parse_kwargs(**kwargs)
+        self.initialize_video_creation()
 
         curdir = os.getcwd() # we need to cd to the folder where the video is saved and then back here
         os.chdir(self.save_fld)
-        print(f"Saving video in {self.save_fld}")
+        cprint(f"Saving video in {self.save_fld}. Video name: {self.save_name}.{self.video_format} - {self.niters} frames", 'green', attrs=['bold'])
 
-        # Create video
-        video = Video(name=self.save_name, 
-                    duration=self.duration, fps=self.fps)
+        # Check arguments are ok
+        if os.path.isfile(self.complete_save_path):
+            cprint(f"A video file with path {self.complete_save_path} exists alread", 'red', attrs=['bold'])
+            yn = ""
+            while yn.lower() != "y":
+                yn = input("If you continue you'll overwrite it [y/n]: ")
+                if yn.lower() == "n":
+                    print("Exiting...")
+                    return
 
-        # Render the scene first
-        self.scene.render(interactive=False)
+        if 'mp4' not in self.video_format: raise ValueError("Currently only .mp4 video format is supported")
+
+        if self.duration is not None and self.fps is not None:
+            print("An argument was passed for both duration and fps, but can't specify both at the same time"+
+                    "The fps argument will be ignored.")
+
+        # Render the scene first [to set the camera]
+        self.scene.render(interactive=False, verbose=False)
 
         # Make frames
-        for i in range(self.niters):
-            self.scene.plotter.show() # render(interactive=False, video=True)  # render the scene first
-            self.scene.plotter.camera.Elevation(elevation)
-            self.scene.plotter.camera.Azimuth(azimuth)
-            self.scene.plotter.camera.Roll(roll) 
-            video.addFrame()
-        video.close()  # merge all the recorded frames
+        self.make_frames(azimuth=azimuth, elevation=elevation, roll=roll)
 
-        # Cd bake to original dir
-        os.chdir(curdir)
+        # merge the recorded frames and crate a video
+        self.close()  
 
-class CustomVideoMaker(BasicVideoMaker):
-    """
-        Subclasses BasicVideoMaker and replaces make_video method.
-    """
-    def __init__(self, scene, **kwargs):
-        BasicVideoMaker.__init__(self, scene, **kwargs)
-
-    def make_video(self, video_function, **kwargs):
-        """
-        Let's users use a custom function to create the video.
-        The custom function must:
-            - have a 'scene' keyword argument to accept a Scene() instance
-            - have a 'video' keyword argument to accept a Video() instance
-            - return the instance of Video
-
-        The custom function can manipulate actors and camera in the scene and 
-        add frames to the video with 'video.addFrame()'. 
-        Once all frames are ready it has to return the video object 
-        so that the video can be closed and saved.     
-
-        """
-        self.parse_kwargs(**kwargs)
-
-        curdir = os.getcwd() # we need to cd to the folder where the video is saved and then back here
-        os.chdir(self.save_fld)
-
-        # Create video
-        video = Video(name=self.save_name+self.video_format, 
-                    duration=self.duration, fps=self.fps)
-
-        # run custom function
-        video = videofunc(scene=self.scene, video=video)
-
-        # Check output
-        if video is None: 
-            raise ValueError("The custom video function didn't return anything."+
-                                    "It must return the video object so that it can be closed properly.")
-        if not isinstance(video, Video):
-            raise ValueError(f"The custom video function returned invalid objects: {video} instead of video object")
-
-        # close video
-        video.close()  

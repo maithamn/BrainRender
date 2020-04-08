@@ -1245,7 +1245,7 @@ class Scene(ABA):  # subclass brain render to have acces to structure trees
 		return all_actors
 
 	# ---------------------------------- Render ---------------------------------- #
-	def render(self, interactive=True, video=False, camera=None, zoom=None, **kwargs):
+	def render(self, interactive=True, video=False, camera=None, zoom=None, verbose=True, **kwargs):
 		"""
 		Takes care of rendering the scene
 		"""
@@ -1258,12 +1258,14 @@ class Scene(ABA):  # subclass brain render to have acces to structure trees
 				camera = check_camera_param(camera)
 			set_camera(self, camera)
 
-			if self.verbose and not self.jupyter:
-				print(INTERACTIVE_MSG)
-			elif self.jupyter:
-				print("\n\nRendering scene.\n   Press 'Esc' to Quit")
-			else:
-				print("\n\nRendering scene.\n   Press 'q' to Quit")
+
+			if verbose:
+				if self.verbose and not self.jupyter:
+					print(INTERACTIVE_MSG)
+				elif self.jupyter:
+					print("\n\nRendering scene.\n   Press 'Esc' to Quit")
+				else:
+					print("\n\nRendering scene.\n   Press 'q' to Quit")
 
 			self._get_inset()
 
