@@ -104,6 +104,9 @@ class BasicVideoMaker:
         cap = get_cap_from_images_folder(self.tmp_dir.name)
         save_videocap_to_video(cap, self.complete_save_path, self.video_format, fps=self.fps)
 
+        # Remove saved screenshots
+        self.tmp_dir.cleanup()
+
         cprint(f"\nVideo creation completed, file saved at {self.complete_save_path}", 'green', attrs=['bold'])
 
 
