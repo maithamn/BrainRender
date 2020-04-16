@@ -2,7 +2,8 @@ import numpy as np
 import os
 import datetime
 import random
-from vtkplotter import Plotter, shapes, ProgressBar, show, settings, screenshot, importWindow, interactive
+from vtkplotter import Plotter, shapes, ProgressBar, show, settings, importWindow, interactive
+from vtkplotter.vtkio import screenshot
 from vtkplotter import Text2D, closePlotter  
 from vtkplotter.shapes import Cylinder, Line, DashedLine
 from tqdm import tqdm
