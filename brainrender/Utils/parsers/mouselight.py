@@ -483,7 +483,7 @@ class NeuronsParser(Paths):
 				return [], []
 			else:
 				raise ValueError("Something went wrong while rendering neurites:\n{}".format(neurites))
-		branching_points = parent_counts.loc[(parent_counts > 1)&parent_counts.index>0)]
+		branching_points = parent_counts.loc[(parent_counts > 1)&(parent_counts.index>0)]
 
 		# loop over each branching point
 		actors = []
